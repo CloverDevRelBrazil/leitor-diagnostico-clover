@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Leitor de conectividade do terminal Clover</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#14324A; --ink-2:#4E6275; --paper:#F7F9FA; --surface:#FFFFFF; --line:#D8E0E6;
+  --ok:#22795A; --ok-bg:#E3F3EC; --warn:#9A6A0B; --warn-bg:#FBF1DC; --bad:#A63A33; --bad-bg:#F8E4E2; --info:#2D5F8A; --info-bg:#E4EEF7;
+  --code-bg:#EEF2F5;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --ink:#E4ECF2; --ink-2:#9FB1C0; --paper:#0F1A23; --surface:#16242F; --line:#2A3B48;
+  --ok:#5CC79B; --ok-bg:#163428; --warn:#E3B04D; --warn-bg:#352A12; --bad:#EC8A82; --bad-bg:#3A1C1A; --info:#82B4E0; --info-bg:#172C40; --code-bg:#1D2E3B;
+}}
+:root[data-theme="dark"]{
+  --ink:#E4ECF2; --ink-2:#9FB1C0; --paper:#0F1A23; --surface:#16242F; --line:#2A3B48;
+  --ok:#5CC79B; --ok-bg:#163428; --warn:#E3B04D; --warn-bg:#352A12; --bad:#EC8A82; --bad-bg:#3A1C1A; --info:#82B4E0; --info-bg:#172C40; --code-bg:#1D2E3B;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.55 "Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:960px;margin:0 auto;padding:40px 20px 80px}
+h1{font-size:2.1rem;line-height:1.15;margin:0 0 .4em;letter-spacing:-.01em}
+h2{font-size:1.35rem;margin:2.4em 0 .6em}
+h3{font-size:1.05rem;margin:1.4em 0 .4em}
+p{max-width:68ch;margin:.5em 0}
+.lead{color:var(--ink-2);font-size:1.08rem}
+code,.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;font-size:.84em}
+code{background:var(--code-bg);padding:.1em .35em;border-radius:4px}
+.drop{margin-top:28px;border:2px dashed var(--line);border-radius:14px;background:var(--surface);padding:34px 24px;text-align:center;cursor:pointer;transition:border-color .15s, background .15s}
+.drop:hover,.drop:focus-visible,.drop.over{border-color:var(--info);background:var(--info-bg);outline:none}
+.drop strong{display:block;font-size:1.2rem;margin-bottom:4px}
+.drop span{color:var(--ink-2)}
+button{font:inherit;font-weight:700;border:1px solid var(--ink);background:var(--ink);color:var(--paper);padding:.55em 1.1em;border-radius:8px;cursor:pointer}
+button.ghost{background:transparent;color:var(--ink)}
+button:focus-visible{outline:3px solid var(--info);outline-offset:2px}
+.hidden{display:none!important}
+.verdict{margin-top:32px;padding:22px 24px;border-radius:14px;border-left:8px solid var(--ok);background:var(--ok-bg)}
+.verdict.warn{border-color:var(--warn);background:var(--warn-bg)}
+.verdict.bad{border-color:var(--bad);background:var(--bad-bg)}
+.verdict h2{margin:0 0 .3em;font-size:1.5rem}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:18px}
+.facts div{background:var(--surface);padding:14px 16px}
+.facts dt{color:var(--ink-2);font-size:.85rem}
+.facts dd{margin:2px 0 0;font-weight:700;overflow-wrap:anywhere}
+.timeline{list-style:none;margin:0;padding:0;border-left:3px solid var(--line);margin-left:8px}
+.timeline li{position:relative;padding:0 0 18px 22px}
+.timeline li::before{content:"";position:absolute;left:-9px;top:6px;width:15px;height:15px;border-radius:50%;background:var(--surface);border:3px solid var(--ink-2)}
+.timeline li.ok::before{border-color:var(--ok)} .timeline li.warn::before{border-color:var(--warn)} .timeline li.bad::before{border-color:var(--bad)} .timeline li.info::before{border-color:var(--info)}
+.timeline .when{font-weight:700}
+.timeline .what{color:var(--ink-2)}
+.tag{display:inline-block;font-size:.78rem;font-weight:700;padding:.1em .55em;border-radius:99px;margin-left:6px;vertical-align:1px}
+.tag.ok{background:var(--ok-bg);color:var(--ok)} .tag.warn{background:var(--warn-bg);color:var(--warn)} .tag.bad{background:var(--bad-bg);color:var(--bad)} .tag.info{background:var(--info-bg);color:var(--info)}
+details.raw{margin-top:4px}
+details.raw summary{cursor:pointer;color:var(--info);font-size:.9rem}
+details.raw pre{margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--code-bg);padding:10px 12px;border-radius:8px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.78rem}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:.95rem}
+th,td{text-align:left;vertical-align:top;padding:10px 14px;border-bottom:1px solid var(--line)}
+th{font-size:.85rem;color:var(--ink-2);font-weight:700;background:var(--paper)}
+tr:last-child td{border-bottom:0}
+.bars{display:flex;align-items:flex-end;gap:4px;height:90px;padding:10px 0 0;border-bottom:1px solid var(--line)}
+.bars i{flex:1;min-width:6px;background:var(--ok);border-radius:3px 3px 0 0}
+.bars i.slow{background:var(--warn)} .bars i.fail{background:var(--bad)}
+.note{color:var(--ink-2);font-size:.92rem}
+textarea{width:100%;min-height:180px;font:inherit;font-size:.95rem;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.steps{padding-left:1.3em} .steps li{margin:.4em 0;max-width:68ch}
+footer{margin-top:60px;color:var(--ink-2);font-size:.88rem}
+@media (max-width:560px){h1{font-size:1.65rem} main{padding-top:24px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+<h1>Leitor de conectividade do terminal Clover</h1>
+<p class="lead">Siga os passos abaixo para gerar o diagnóstico do terminal e depois envie o arquivo .txt aqui. A página separa, no meio de milhares de linhas, só o que diz respeito à conexão com a Clover e mostra se houve queda, por quê e quanto tempo levou para voltar.</p>
+
+<h2>Passo a passo</h2>
+<ol class="steps">
+<li><strong>Logo depois que o problema acontecer</strong>, abra no terminal o app <strong>Ajuda</strong>. Em versões mais novas ele aparece como <strong>Diagnóstico</strong>.</li>
+<li>Toque no menu (☰) no canto superior esquerdo e escolha <strong>Diagnóstico</strong>.</li>
+<li>Para uma checagem rápida no próprio terminal, abra o <strong>histórico de conexão</strong> e rode o <strong>teste de velocidade</strong>. Eles mostram se o aparelho ficou offline e se a conexão com o servidor está lenta.</li>
+<li>Toque em <strong>Enviar logs do dispositivo</strong> (<em>Send Device Logs</em>). O terminal manda o registro completo para os servidores da Clover. O log cobre só o período desde a última reinicialização, então não reinicie o terminal antes de enviar.</li>
+<li>Informe ao suporte da Clover o <strong>número de série</strong> do terminal, o <strong>horário aproximado</strong> da falha e se ele estava no <strong>Wi-Fi ou no chip</strong>. O número de série aparece na mesma tela de Diagnóstico.</li>
+<li>Com o arquivo .txt do diagnóstico em mãos, envie-o abaixo para ver a análise.</li>
+</ol>
+<p class="note">Terminais de desenvolvimento (DevKit, sandbox) também podem gerar o arquivo pelo computador com <code>adb logcat -d &gt; diagnostico.txt</code>. Esse arquivo também pode ser analisado aqui.</p>
+
+<label class="drop" id="drop" tabindex="0" for="file">
+  <strong>Escolher o arquivo do diagnóstico</strong>
+  <span>ou arraste o .txt para cá. O arquivo é lido só no seu navegador e não é enviado a lugar nenhum.</span>
+</label>
+<input type="file" id="file" accept=".txt,.log,text/plain" class="hidden">
+<p id="status" class="note" role="status" aria-live="polite"></p>
+
+<section id="result" class="hidden">
+  <div id="verdict" class="verdict"></div>
+  <dl class="facts" id="facts"></dl>
+
+  <h2>O que aconteceu com a conexão</h2>
+  <p class="note">Cada item mostra a linha do arquivo onde o evento está. Abra o .txt num editor (Notepad++, VS Code) e use "Ir para linha" para ver o contexto.</p>
+  <ol class="timeline" id="timeline"></ol>
+
+  <h2>Testes de internet</h2>
+  <p class="note">O terminal faz de tempos em tempos um teste rápido contra o servidor da Clover (<code>generate_204</code>). Resposta 204 significa que a internet chegou até a Clover. Barras em amarelo levaram mais de 2 segundos.</p>
+  <div class="bars" id="bars" aria-hidden="true"></div>
+  <p id="checksText"></p>
+
+  <h2>Resumo pronto para o chamado</h2>
+  <textarea id="summary" aria-label="Resumo para copiar"></textarea>
+  <div class="row"><button id="copy">Copiar resumo</button><span id="copied" class="note"></span></div>
+</section>
+
+<h2>Como ler o diagnóstico sem a ferramenta</h2>
+<p>O arquivo junta o log inteiro do Android. A parte de conexão representa menos de 1% dele. Para achar à mão, abra o .txt num editor e pesquise (Ctrl+F) pelos termos abaixo, nesta ordem.</p>
+
+<div class="scroll"><table>
+<thead><tr><th>Pesquise por</th><th>O que significa</th><th>Situação saudável</th></tr></thead>
+<tbody>
+<tr><td><code>OkPushService</code></td><td>Serviço que mantém o terminal ligado ao servidor da Clover. É a principal referência de "online / offline".</td><td>Poucas ocorrências de <code>Disconnecting</code>, sempre seguidas de <code>Connecting</code> em segundos.</td></tr>
+<tr><td><code>mainOpen</code></td><td>A conexão com a Clover foi aberta (resposta 101 Switching Protocols).</td><td>Aparece logo depois de cada queda.</td></tr>
+<tr><td><code>mainFailure</code></td><td>A conexão caiu por erro. O texto depois de <code>throwable=</code> diz o tipo de erro.</td><td>Raro e isolado. Várias seguidas indicam rede instável.</td></tr>
+<tr><td><code>mainClosing</code></td><td>O servidor encerrou a conexão. Com <code>Connection Idle Time Close</code> é só ociosidade.</td><td>Normal, acontece a cada cerca de uma hora.</td></tr>
+<tr><td><code>Disconnecting with reason</code></td><td>Motivo da desconexão: <code>CLOSE_OTHER</code> (encerramento normal), <code>ERROR_COMMUNICATION</code> (erro de comunicação), <code>NETWORK</code> (o aparelho perdeu a rede).</td><td>Predomínio de <code>CLOSE_OTHER</code>.</td></tr>
+<tr><td><code>Broadcasting status</code></td><td>O status que o terminal mostra para os apps: <code>true</code> online, <code>false</code> offline.</td><td>Períodos de <code>false</code> curtos.</td></tr>
+<tr><td><code>generate_204</code></td><td>Teste de internet até o servidor da Clover, com o tempo de resposta.</td><td><code>status: 204</code> e tempo abaixo de 2 s.</td></tr>
+<tr><td><code>setWifiEnabled</code></td><td>Alguém ligou ou desligou o Wi-Fi. <code>package=com.android.settings</code> indica que foi feito à mão pela tela de Configurações.</td><td>Não deve aparecer, a não ser em teste.</td></tr>
+<tr><td><code>EVENT_NETWORK_INFO_CHANGED</code></td><td>O Android trocou o estado da rede (Wi-Fi ou chip) entre CONNECTED e DISCONNECTED.</td><td>Poucas trocas.</td></tr>
+<tr><td><code>SSID: "</code> e <code>rssi=</code></td><td>Nome da rede Wi-Fi e força do sinal em dBm.</td><td>RSSI entre -30 e -67 é bom. Abaixo de -75 é fraco.</td></tr>
+<tr><td><code>mOperatorAlphaLong</code> e <code>IconGroup(</code></td><td>Operadora do chip e tecnologia (LTE = 4G).</td><td>Operadora preenchida, LTE e nível 3 ou 4.</td></tr>
+</tbody></table></div>
+
+<h3>Como interpretar os erros mais comuns</h3>
+<div class="scroll"><table>
+<thead><tr><th>Erro</th><th>Leitura provável</th></tr></thead>
+<tbody>
+<tr><td><code>java.io.EOFException</code></td><td>A conexão foi cortada no meio do caminho, sem aviso. Se for isolado, é oscilação momentânea da rede ou do servidor.</td></tr>
+<tr><td><code>SocketException: Software caused connection abort</code></td><td>O próprio aparelho derrubou a conexão, normalmente porque a rede usada sumiu (Wi-Fi desligado, troca de rede).</td></tr>
+<tr><td><code>SocketTimeoutException</code></td><td>O servidor não respondeu a tempo. Repetido, indica internet lenta ou bloqueio no firewall.</td></tr>
+<tr><td><code>UnknownHostException</code></td><td>O terminal não conseguiu resolver o endereço da Clover. Indica problema de DNS ou rede sem internet.</td></tr>
+<tr><td><code>SSLHandshakeException</code></td><td>Falha na conexão segura. Costuma ser data e hora erradas no terminal ou rede com inspeção de tráfego (proxy corporativo).</td></tr>
+</tbody></table></div>
+
+<h3>O que pode ser ignorado</h3>
+<p>Linhas com <code>avc: denied</code>, <code>BatteryStatsService</code>, <code>Looper</code>, <code>am_pss</code> e blocos <code>dumpsys</code> (SurfaceFlinger, window, meminfo) são rotinas internas do Android e não têm relação com a conexão. Erros de <code>DhcpClient</code> e <code>SupplicantStaNetworkHal</code> no mesmo segundo em que o Wi-Fi foi desligado são consequência do desligamento, não a causa.</p>
+
+<footer>Os horários do log seguem o relógio do terminal.</footer>
+</main>
+<script>
+function parseDump(text){
+  const lines = text.split(/\r?\n/);
+  const tsRe = /^(\d\d-\d\d) (\d\d:\d\d:\d\d)\.(\d{3})/;
+  const r = {meta:{}, push:[], wifi:[], net:[], checks:[], checkFails:[], rssi:[], ssids:{}, mobile:{}, range:{}};
+  const g = (re)=>{ const m = text.match(re); return m?m[1].trim():null; };
+  r.meta.build = g(/^Build:\s*(.+)$/m);
+  r.meta.model = g(/ro\.product\.model\]: \[([^\]]+)\]/);
+  r.meta.serial = g(/ro\.serialno\]: \[([^\]]+)\]/);
+  r.meta.env = g(/clover_cloud_url: using secure setting: (\S+)/) || g(/url=(https:\/\/[^\/,\s]+)\/push/);
+  const ev = g(/^Event timestamp:\s*(\d+)/m);
+  if(ev) r.meta.sent = new Date(Number(ev));
+  const toSec = t => { const [h,m,s]=t.split(':').map(Number); return h*3600+m*60+s; };
+  let first=null,last=null;
+  for(let i=0;i<lines.length;i++){
+    const L = lines[i]; const m = L.match(tsRe); if(!m) continue;
+    const time = m[2], date=m[1], full=date+' '+time;
+    if(!first) first=full; last=full;
+    const at = {time, date, line:i+1, sec: toSec(time)+Number(m[3])/1000, raw:L.slice(0,320)};
+    let x;
+    if(L.includes('OkPushService')||L.includes('PushStatusBroadcaster')){
+      if((x=L.match(/mainOpen\(/))) r.push.push({...at,kind:'open',text:'Conexão com a Clover aberta'});
+      else if((x=L.match(/mainFailure.*?throwable=([^,]+(?:: [^,]+)?), response/))) r.push.push({...at,kind:'failure',detail:x[1],text:'Conexão caiu com erro'});
+      else if((x=L.match(/mainClosing.*?code=(\d+), reason=(.*)$/))) r.push.push({...at,kind:'closing',detail:`code ${x[1]}, ${x[2].trim()}`,text: /idle/i.test(x[2])?'Encerrada pelo servidor por ociosidade':'Encerrada pelo servidor'});
+      else if((x=L.match(/Disconnecting with reason: (\w+)/))) r.push.push({...at,kind:'disconnect',detail:x[1],text:'Desconectado'});
+      else if((x=L.match(/Connectivity change, connected\? (true|false)/))) r.push.push({...at,kind:'connectivity',detail:x[1],text: x[1]==='true'?'Aparelho voltou a ter rede':'Aparelho ficou sem rede'});
+      else if(/connect\(OkPushService[^)]*\).*Connecting/.test(L)) r.push.push({...at,kind:'connecting',text:'Tentando reconectar'});
+      else if((x=L.match(/Broadcasting status: (true|false)/))) r.push.push({...at,kind:'status',detail:x[1],text: x[1]==='true'?'Status: online':'Status: offline'});
+      else if(/mainMessage.*pushRtt/.test(L)) r.push.push({...at,kind:'rtt',text:'Teste de ida e volta do servidor respondido'});
+    }
+    if((x=L.match(/setWifiEnabled package=(\S+) uid=\d+ enable=(true|false)/))) r.wifi.push({...at,pkg:x[1],on:x[2]==='true'});
+    if((x=L.match(/ConnectivityService: \[(\d+) (\w+)\] EVENT_NETWORK_INFO_CHANGED, going from (\w+) to (\w+)/))) r.net.push({...at,type:x[2],from:x[3],to:x[4]});
+    if(L.includes('generate_204')){
+      if((x=L.match(/Execution complete of request \w+ (\S+) in ([\d.,]+)ms, status: (\d+)/))) r.checks.push({...at,ms:parseFloat(x[2].replace(',','.')),status:Number(x[3])});
+      else if(/exception|failed|timeout|unable|unknownhost/i.test(L)) r.checkFails.push({...at,text:L.slice(m[0].length).trim().slice(0,200)});
+    }
+    const rs = L.match(/[^m]rssi[=:] ?(-\d{2,3})\b/i);
+    if(rs && /wifi|wlan|ssid|bssid/i.test(L)){ const v=Number(rs[1]); if(v<-20&&v>-110) r.rssi.push(v); }
+  }
+  r.range={first,last};
+  for(const s of text.matchAll(/SSID: ?"([^"\n]{1,40})"/g)) r.ssids[s[1]]=(r.ssids[s[1]]||0)+1;
+  const op = [...text.matchAll(/mOperatorAlphaLong=([^,\s][^,]*)/g)].map(a=>a[1]).filter(v=>v!=='null');
+  if(op.length) r.mobile.operator = op[0];
+  const cs = text.match(/Current State: connected=(true|false),enabled=(true|false),level=(\d),[^\n]*?iconGroup=IconGroup\((\w+)\)/);
+  if(cs) r.mobile = {...r.mobile, connected:cs[1]==='true', level:Number(cs[3]), tech:cs[4]};
+  // reconnection durations
+  r.incidents=[];
+  for(let i=0;i<r.push.length;i++){
+    const e=r.push[i];
+    if(e.kind==='failure'||e.kind==='closing'){
+      const reopen = r.push.slice(i+1).find(p=>p.kind==='open');
+      const cause = e.kind==='closing' ? 'normal' : 'erro';
+      const wifiOff = r.wifi.find(w=>!w.on && Math.abs(w.sec-e.sec)<10);
+      r.incidents.push({...e, cause: wifiOff?'manual':cause, reconnectS: reopen? +(reopen.sec-e.sec).toFixed(1):null, reopenAt: reopen?reopen.time:null, wifiOff});
+    }
+  }
+  return r;
+}
+if(typeof module!=='undefined') module.exports={parseDump};
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtS = s => s==null?'sem reconexão no log': s<60? `${s.toString().replace('.',',')} s` : `${Math.floor(s/60)} min ${Math.round(s%60)} s`;
+const ddmm = d => d? d.split('-').reverse().join('/') : '';
+function render(r){
+  const fails = r.incidents.filter(i=>i.cause==='erro');
+  const manual = r.incidents.filter(i=>i.cause==='manual');
+  const normal = r.incidents.filter(i=>i.cause==='normal');
+  const slow = r.checks.filter(c=>c.ms>2000);
+  const badChecks = r.checks.filter(c=>c.status!==204).length + r.checkFails.length;
+  const longOut = r.incidents.filter(i=>i.cause!=='normal' && (i.reconnectS==null || i.reconnectS>60));
+  let level='ok', title='Conexão estável', text='';
+  if(!r.push.length && !r.checks.length){ level='warn'; title='Nenhum evento de conexão encontrado'; text='O arquivo não tem registros do serviço de conexão da Clover. Confira se é o .txt do app de Diagnóstico.'; }
+  else if(fails.length>=3 || badChecks>=2 || longOut.length){ level='bad'; title='Conexão instável'; text=`Foram encontradas ${fails.length} queda(s) por erro${longOut.length?`, ${longOut.length} delas demorando mais de 1 minuto para voltar`:''}${badChecks?` e ${badChecks} teste(s) de internet com falha`:''}.`; }
+  else if(fails.length || slow.length>r.checks.length/3){ level='warn'; title='Conexão estável, com oscilações pontuais'; text=`${fails.length} queda(s) por erro, todas com reconexão automática.${slow.length?` ${slow.length} de ${r.checks.length} testes de internet passaram de 2 s.`:''}`; }
+  else text='Nenhuma queda por erro de rede no período.';
+  if(manual.length) text+=` ${manual.length} desconexão(ões) causada(s) por desligamento manual do Wi-Fi.`;
+  $('verdict').className='verdict '+(level==='ok'?'':level);
+  $('verdict').innerHTML=`<h2>${esc(title)}</h2><p>${esc(text)}</p>`;
+  const rs=r.rssi.length?`${Math.max(...r.rssi)} a ${Math.min(...r.rssi)} dBm`:'não registrado';
+  const ssid=Object.keys(r.ssids).sort((a,b)=>r.ssids[b]-r.ssids[a])[0];
+  const facts=[
+    ['Terminal', [r.meta.model, r.meta.serial].filter(Boolean).join(', ')||'não identificado'],
+    ['Ambiente', r.meta.env||'não identificado'],
+    ['Período do log', r.range.first? `${ddmm(r.range.first.slice(0,5))} ${r.range.first.slice(6,11)} até ${r.range.last.slice(6,11)}`:'—'],
+    ['Wi-Fi', ssid? `${ssid} (sinal ${rs})`:'não identificado'],
+    ['Chip', r.mobile.operator? `${r.mobile.operator}${r.mobile.tech?`, ${r.mobile.tech}`:''}${r.mobile.level!=null?`, nível ${r.mobile.level}/4`:''}`:'sem chip ou sem registro'],
+    ['Testes de internet', r.checks.length? `${r.checks.length-r.checks.filter(c=>c.status!==204).length} de ${r.checks.length} com sucesso`:'nenhum no log']
+  ];
+  $('facts').innerHTML=facts.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
+  // timeline
+  const items=[];
+  r.incidents.forEach(i=>{
+    const cls=i.cause==='normal'?'ok':i.cause==='manual'?'info':(i.reconnectS!=null&&i.reconnectS<=60?'warn':'bad');
+    const label=i.cause==='normal'?'Normal':i.cause==='manual'?'Ação manual':'Queda por erro';
+    let what=i.cause==='normal'?'O servidor encerrou a conexão por ociosidade.':i.cause==='manual'?'Wi-Fi desligado pela tela de Configurações; o terminal trocou de rede.':`Erro: ${i.detail}.`;
+    what+=` Reconexão: ${fmtS(i.reconnectS)}${i.reopenAt?` (às ${i.reopenAt})`:''}.`;
+    items.push({sec:i.sec,line:i.line,cls,label,time:i.time,what,raw:i.raw});
+  });
+  r.wifi.forEach(w=>items.push({sec:w.sec,line:w.line,cls:'info',label:w.on?'Wi-Fi ligado':'Wi-Fi desligado',time:w.time,what:w.pkg==='com.android.settings'?'Feito manualmente na tela de Configurações.':`Solicitado por ${w.pkg}.`,raw:w.raw}));
+  r.net.forEach(n=>{ if(!items.some(x=>Math.abs(x.sec-n.sec)<3 && x.label.startsWith('Wi-Fi'))) items.push({sec:n.sec,line:n.line,cls:n.to==='CONNECTED'?'ok':'warn',label:`Rede ${n.type==='WIFI'?'Wi-Fi':'do chip'}`,time:n.time,what:`Mudou de ${n.from} para ${n.to}.`,raw:n.raw}); });
+  items.sort((a,b)=>a.sec-b.sec);
+  $('timeline').innerHTML = items.length? items.map(it=>`<li class="${it.cls}"><span class="when">${esc(it.time)}</span><span class="tag ${it.cls}">${esc(it.label)}</span><div class="what">${esc(it.what)} <span class="mono">linha ${it.line}</span></div><details class="raw"><summary>Ver linha original</summary><pre>${esc(it.raw)}</pre></details></li>`).join('') : '<li class="ok"><span class="when">Sem quedas</span><div class="what">A conexão ficou aberta durante todo o período do log.</div></li>';
+  // checks
+  const max=Math.max(3000,...r.checks.map(c=>c.ms));
+  $('bars').innerHTML=r.checks.map(c=>`<i class="${c.status!==204?'fail':c.ms>2000?'slow':''}" style="height:${Math.max(6,c.ms/max*100)}%" title="${c.time}, ${Math.round(c.ms)} ms, status ${c.status}"></i>`).join('');
+  const med = r.checks.length? [...r.checks].map(c=>c.ms).sort((a,b)=>a-b)[Math.floor(r.checks.length/2)]:null;
+  $('checksText').textContent = r.checks.length? `${r.checks.length} testes, tempo típico de ${Math.round(med)} ms${slow.length?`. Mais lentos: ${slow.map(s=>`${s.time} (${(s.ms/1000).toFixed(1).replace('.',',')} s)`).join(', ')}`:''}.${r.checkFails.length?` ${r.checkFails.length} teste(s) não completaram.`:''}` : 'Nenhum teste de internet registrado no período.';
+  // summary
+  const lines=[];
+  lines.push(`Diagnóstico de conectividade – terminal ${[r.meta.model,r.meta.serial].filter(Boolean).join(' ')}${r.meta.env?`, ambiente ${r.meta.env}`:''}.`);
+  if(r.range.first) lines.push(`Período analisado: ${ddmm(r.range.first.slice(0,5))}, das ${r.range.first.slice(6,11)} às ${r.range.last.slice(6,11)}.`);
+  lines.push(`Resultado: ${title.toLowerCase()}.`);
+  if(fails.length) lines.push(`Quedas por erro: ${fails.map(f=>`${f.time} (${f.detail}, voltou em ${fmtS(f.reconnectS)})`).join('; ')}.`); else lines.push('Quedas por erro: nenhuma.');
+  if(normal.length) lines.push(`Encerramentos normais por ociosidade: ${normal.length}.`);
+  if(manual.length) lines.push(`Desconexões por ação manual no Wi-Fi: ${manual.map(m=>`${m.time} (voltou em ${fmtS(m.reconnectS)})`).join('; ')}.`);
+  if(r.checks.length) lines.push(`Testes de internet: ${r.checks.length-r.checks.filter(c=>c.status!==204).length} de ${r.checks.length} com sucesso, tempo típico ${Math.round(med)} ms.`);
+  if(ssid) lines.push(`Wi-Fi: ${ssid}, sinal ${rs}.`);
+  if(r.mobile.operator) lines.push(`Chip: ${r.mobile.operator}${r.mobile.tech?` ${r.mobile.tech}`:''}${r.mobile.level!=null?`, nível ${r.mobile.level}/4`:''}.`);
+  $('summary').value=lines.join('\n');
+  $('result').classList.remove('hidden');
+  $('result').scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+}
+function load(file){
+  if(!file) return;
+  $('status').textContent=`Lendo ${file.name}…`;
+  const fr=new FileReader();
+  fr.onload=()=>{ try{ const r=parseDump(fr.result); render(r); $('status').textContent=`${file.name}: ${fr.result.split('\n').length.toLocaleString('pt-BR')} linhas lidas.`; }catch(e){ $('status').textContent='Não foi possível ler este arquivo. Confira se é o .txt gerado pelo app de Diagnóstico.'; console.error(e);} };
+  fr.onerror=()=>{$('status').textContent='O navegador não conseguiu abrir o arquivo. Tente escolhê-lo de novo.';};
+  fr.readAsText(file);
+}
+$('file').addEventListener('change',e=>load(e.target.files[0]));
+const d=$('drop');
+d.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click();}});
+['dragenter','dragover'].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.add('over');}));
+['dragleave','drop'].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.remove('over');}));
+d.addEventListener('drop',e=>load(e.dataTransfer.files[0]));
+$('copy').addEventListener('click',async()=>{ try{ await navigator.clipboard.writeText($('summary').value); $('copied').textContent='Resumo copiado.'; }catch{ $('summary').select(); document.execCommand('copy'); $('copied').textContent='Resumo copiado.'; } });
+</script></body></html>
